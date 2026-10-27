@@ -11,6 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+<<<<<<< HEAD
     "noEmit": true,
     "declaration": true,
     "declarationMap": true,
@@ -26,3 +27,21 @@
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }
+=======
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@navaja/shared": ["./shared/src"]
+    },
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+>>>>>>> 8c895bf0639182493efa6d613cfa71e5d2a4e241

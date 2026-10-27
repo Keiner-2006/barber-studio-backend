@@ -3,11 +3,7 @@ services:
     name: barber-studio-backend
     env: node
     rootDir: .
-<<<<<<< HEAD
     buildCommand: "npm install && npx nest build"
-=======
-    buildCommand: "npm install && npm run build"
->>>>>>> c650ccec9d98a9e3ec08e613536e9122def015a7
     startCommand: "npm run start:prod"
     envVars:
       - key: NODE_ENV

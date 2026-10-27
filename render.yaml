@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: barber-studio-backend
+    env: node
+    rootDir: .
+    buildCommand: "npm install && npx nest build"
+    startCommand: "npm run start:prod"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_INTERNAL_URL
+        sync: false
+      - key: PLATFORM_DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DEMO_AUTH
+        value: "false"
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_UPLOAD_PRESET
+        value: Barber_Studio
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

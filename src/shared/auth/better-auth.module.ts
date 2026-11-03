@@ -1,7 +1,6 @@
-import { Logger, Module, Global, Injectable, Inject, OnModuleDestroy } from '@nestjs/common';
+import { Module, Global, Injectable, Inject, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { getDatabaseErrorDetails, getDatabaseTarget, getDatabaseUrlSource } from '../db/database-connection-diagnostics';
 
 export const BETTER_AUTH = Symbol('BETTER_AUTH');
 export const BETTER_AUTH_POOL = Symbol('BETTER_AUTH_POOL');
@@ -29,32 +28,11 @@ class BetterAuthPoolLifecycle implements OnModuleDestroy {
         if (!config?.databaseUrl) {
           throw new Error('DATABASE_INTERNAL_URL, AUTH_DATABASE_URL, PLATFORM_DATABASE_URL, or DATABASE_URL must be configured');
         }
-        const pool = new Pool({
+        return new Pool({
           connectionString: config.databaseUrl,
           ssl: config.databaseSsl ? { rejectUnauthorized: false } : false,
           connectionTimeoutMillis: 5000,
         });
-        const diagnostic = {
-          event: 'database.pool',
-          datasource: 'better-auth',
-          source: getDatabaseUrlSource('auth'),
-          target: getDatabaseTarget(config.databaseUrl),
-          ssl: config.databaseSsl,
-          timeoutMs: 5000,
-        };
-        Logger.log(JSON.stringify({ ...diagnostic, status: 'created' }), 'BetterAuthModule');
-        pool.on('error', (error) => {
-          Logger.error(
-            JSON.stringify({
-              ...diagnostic,
-              status: 'failed',
-              errors: getDatabaseErrorDetails(error),
-            }),
-            undefined,
-            'BetterAuthModule',
-          );
-        });
-        return pool;
       },
       inject: [ConfigService],
     },

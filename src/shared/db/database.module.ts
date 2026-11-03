@@ -1,7 +1,8 @@
-import { Module, Global, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Logger, Module, Global, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { ConfigService, ConfigType } from '@nestjs/config';
 import databaseConfig from '../../config/database.config';
+import { getDatabaseErrorDetails, getDatabaseTarget, getDatabaseUrlSource } from './database-connection-diagnostics';
 
 // Platform entities (tenant-scoped)
 import { BranchEntity } from '../../modules/branches/drivers/persistence/branch.entity';
@@ -105,9 +106,36 @@ function createDataSourceOptions(config: ConfigType<typeof databaseConfig>, type
       useFactory: async (configService: ConfigService) => {
         const config = configService.get<ConfigType<typeof databaseConfig>>('database');
         if (!config) throw new Error('Database configuration is missing');
+        const dbConfig = config.platform;
+        const startedAt = Date.now();
+        const diagnostic = {
+          event: 'database.connection',
+          datasource: 'platform',
+          source: getDatabaseUrlSource('platform'),
+          target: getDatabaseTarget(dbConfig.url),
+          schema: dbConfig.schema,
+          ssl: dbConfig.ssl,
+          timeoutMs: 5000,
+        };
+        Logger.log(JSON.stringify({ ...diagnostic, status: 'starting' }), 'DatabaseModule');
         const dataSource = new DataSource(createDataSourceOptions(config, 'platform'));
-        await dataSource.initialize();
-        return dataSource;
+        try {
+          await dataSource.initialize();
+          Logger.log(JSON.stringify({ ...diagnostic, status: 'connected', elapsedMs: Date.now() - startedAt }), 'DatabaseModule');
+          return dataSource;
+        } catch (error) {
+          Logger.error(
+            JSON.stringify({
+              ...diagnostic,
+              status: 'failed',
+              elapsedMs: Date.now() - startedAt,
+              errors: getDatabaseErrorDetails(error),
+            }),
+            undefined,
+            'DatabaseModule',
+          );
+          throw error;
+        }
       },
       inject: [ConfigService],
     },
@@ -116,9 +144,36 @@ function createDataSourceOptions(config: ConfigType<typeof databaseConfig>, type
       useFactory: async (configService: ConfigService) => {
         const config = configService.get<ConfigType<typeof databaseConfig>>('database');
         if (!config) throw new Error('Database configuration is missing');
+        const dbConfig = config.auth;
+        const startedAt = Date.now();
+        const diagnostic = {
+          event: 'database.connection',
+          datasource: 'auth',
+          source: getDatabaseUrlSource('auth'),
+          target: getDatabaseTarget(dbConfig.url),
+          schema: dbConfig.schema,
+          ssl: dbConfig.ssl,
+          timeoutMs: 5000,
+        };
+        Logger.log(JSON.stringify({ ...diagnostic, status: 'starting' }), 'DatabaseModule');
         const dataSource = new DataSource(createDataSourceOptions(config, 'auth'));
-        await dataSource.initialize();
-        return dataSource;
+        try {
+          await dataSource.initialize();
+          Logger.log(JSON.stringify({ ...diagnostic, status: 'connected', elapsedMs: Date.now() - startedAt }), 'DatabaseModule');
+          return dataSource;
+        } catch (error) {
+          Logger.error(
+            JSON.stringify({
+              ...diagnostic,
+              status: 'failed',
+              elapsedMs: Date.now() - startedAt,
+              errors: getDatabaseErrorDetails(error),
+            }),
+            undefined,
+            'DatabaseModule',
+          );
+          throw error;
+        }
       },
       inject: [ConfigService],
     },

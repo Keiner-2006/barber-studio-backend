@@ -10,7 +10,7 @@ import {
   HttpCode,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { z } from 'zod';
 import { AuthService } from '../../shared/auth/auth.service';
@@ -96,7 +96,7 @@ export class AuthController {
     // 1) Authenticate credentials first (prevents role-based enumeration)
     let result: Awaited<ReturnType<AuthService['signIn']>>;
     try {
-      result = await this.authService.signIn({ email: normalizedEmail, password }, new Headers(req.headers as any));
+      result = await this.authService.signIn({ email: normalizedEmail, password }, new globalThis.Headers(req.headers as any));
     } catch (err: any) {
       // Normalize BetterAuth / provider errors to a generic 401 (no user/role leakage)
       const status = err?.status ?? err?.statusCode ?? err?.response?.status;
@@ -158,7 +158,7 @@ export class AuthController {
       throw new ValidationError(`expectedRole inválido: ${expectedRole}.`);
     }
 
-    const result = await this.authService.signUp({ email: email.trim().toLowerCase(), password, name }, new Headers(req.headers as any));
+    const result = await this.authService.signUp({ email: email.trim().toLowerCase(), password, name }, new globalThis.Headers(req.headers as any));
     return {
       user: result.user,
       session: result.session,
@@ -170,7 +170,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cerrar sesión' })
   async logout(@Req() req: Request) {
-    await this.authService.signOut(new Headers(req.headers as any));
+    await this.authService.signOut(new globalThis.Headers(req.headers as any));
     return { success: true };
   }
 
@@ -178,7 +178,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Obtener sesión actual' })
   async session(@Req() req: Request) {
-    const session = await this.authService.getSession(new Headers(req.headers as any));
+    const session = await this.authService.getSession(new globalThis.Headers(req.headers as any));
     if (!session) {
       return { user: null, session: null };
     }

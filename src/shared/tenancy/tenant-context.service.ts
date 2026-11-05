@@ -272,7 +272,7 @@ export class TenantContextService {
     headers: Record<string, string | undefined>,
     expectedFlow?: RoleCategory
   ): Promise<{ session: SessionData; context: RequestContext } | null> {
-    const session = await this.authService.getSession(new Headers(headers as any));
+    const session = await this.authService.getSession(new globalThis.Headers(headers as any));
     if (!session) return null;
 
     const requestedTenantId = this.getRequestedTenantId(headers, session.user);
@@ -305,7 +305,7 @@ export class TenantContextService {
   }
 
   async preloadIdentity(headers: Record<string, string | undefined>, tenantId: string): Promise<void> {
-    const session = await this.authService.getSession(new Headers(headers as any));
+    const session = await this.authService.getSession(new globalThis.Headers(headers as any));
     if (!session) return;
 
     const cacheKey = `${this.getSessionToken(session)}:${tenantId}`;

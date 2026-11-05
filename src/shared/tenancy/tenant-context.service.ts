@@ -286,7 +286,9 @@ export class TenantContextService {
       };
     }
 
-    if (!requestedTenantId) return null;
+    // Allow resolving without explicit x-tenant-id when identity resolved a tenant (e.g. single membership / tenants/me)
+    const effectiveTenantId = requestedTenantId || identity.tenantId || '';
+    if (!effectiveTenantId && !identity.isPlatformAdmin) return null;
 
     return {
       session,

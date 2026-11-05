@@ -8,6 +8,16 @@ export type BetterAuthInstance = ReturnType<
   typeof import('better-auth', { with: { 'resolution-mode': 'import' } }).betterAuth
 >;
 
+function maskHost(url: string): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.hostname ? `${u.hostname}${u.port ? ':' + u.port : ''}` : '(no-host)';
+  } catch {
+    return '(invalid-url)';
+  }
+}
+
 @Injectable()
 class BetterAuthPoolLifecycle implements OnModuleDestroy {
   constructor(@Inject(BETTER_AUTH_POOL) private readonly pool: Pool | null) {}
@@ -28,11 +38,23 @@ class BetterAuthPoolLifecycle implements OnModuleDestroy {
         if (!config?.databaseUrl) {
           throw new Error('DATABASE_INTERNAL_URL, AUTH_DATABASE_URL, PLATFORM_DATABASE_URL, or DATABASE_URL must be configured');
         }
-        return new Pool({
+        const connectionTimeoutMillis = 5000;
+        console.log('[BETTER_AUTH_POOL_DIAG]', JSON.stringify({
+          component: 'better-auth.pool',
+          demoEnabled: !!config?.demoEnabled,
+          host: maskHost(config.databaseUrl),
+          ssl: !!config.databaseSsl,
+          connectionTimeoutMillis,
+        }));
+        const pool = new Pool({
           connectionString: config.databaseUrl,
           ssl: config.databaseSsl ? { rejectUnauthorized: false } : false,
-          connectionTimeoutMillis: 5000,
+          connectionTimeoutMillis,
         });
+        pool.on('error', (err) => {
+          console.error('[BETTER_AUTH_POOL_DIAG] pool error', { message: err?.message, code: (err as any)?.code });
+        });
+        return pool;
       },
       inject: [ConfigService],
     },

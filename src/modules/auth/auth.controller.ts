@@ -3,52 +3,52 @@ import {
   Post,
   Get,
   Body,
+  Headers,
   Req,
   Res,
-  HttpCode,
   HttpStatus,
-  UseGuards,
+  HttpCode,
+  Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
-import { AuthService } from '../../shared/auth/auth.service';
-import type { Credentials, Registration } from '../../shared/auth/auth.service';
-import { RoleResolverService, RoleCategory } from '../../shared/auth/role-resolver.service';
-import { RateLimitService } from '../../shared/http/rate-limit.service';
-import { Public } from '../../common/decorators/public.decorator';
-import { ExpectedFlow } from '../../common/decorators/expected-flow.decorator';
-import { ValidationError, UnauthorizedError, ForbiddenError } from '../../shared/errors/app-error';
+import { Request, Response } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { z } from 'zod';
+import { AuthService } from '../../shared/auth/auth.service';
+import { RoleResolverService } from '../../shared/auth/role-resolver.service';
+import { RateLimitService } from '../../shared/http/rate-limit.service';
+import { ValidationError, UnauthorizedError, ForbiddenError } from '../../shared/errors/application-errors';
+import { Public } from '../../common/decorators/public.decorator';
 
 const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Contraseña requerida'),
+  email: z.string().email(),
+  password: z.string().min(1),
   expectedRole: z.enum(['admin', 'company_member', 'owner', 'customer', 'client', 'platform_admin', 'platform_support']).optional(),
-  tenantId: z.string().uuid('Tenant ID inválido').optional(),
+  tenantId: z.string().optional(),
 });
 
 const registerSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  name: z.string().min(1, 'Nombre requerido'),
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(1),
   expectedRole: z.enum(['admin', 'company_member', 'owner', 'customer', 'client', 'platform_admin', 'platform_support']).optional(),
-  tenantId: z.string().uuid('Tenant ID inválido').optional(),
+  tenantId: z.string().optional(),
 });
 
-const COMPANY_MEMBER_FLOWS = ['company_member', 'staff', 'admin'];
-const CUSTOMER_FLOWS = ['customer', 'client'];
 const PLATFORM_MEMBER_FLOWS = ['platform_admin', 'platform_support'];
 
-function mapExpectedRoleToFlow(expectedRole: string): RoleCategory | null {
-  if (COMPANY_MEMBER_FLOWS.includes(expectedRole.toLowerCase())) return 'company_member';
-  if (CUSTOMER_FLOWS.includes(expectedRole.toLowerCase())) return 'customer';
-  if (PLATFORM_MEMBER_FLOWS.includes(expectedRole.toLowerCase())) return 'platform_member';
-  return null;
+function mapExpectedRoleToFlow(expectedRole?: string): 'company_member' | 'customer' | 'platform_member' | null {
+  if (!expectedRole) return null;
+  const r = expectedRole.toLowerCase();
+  if (PLATFORM_MEMBER_FLOWS.includes(r)) return 'platform_member';
+  if (r === 'customer' || r === 'client') return 'customer';
+  return 'company_member';
 }
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly roleResolver: RoleResolverService,
@@ -62,8 +62,8 @@ export class AuthController {
   @ApiBody({ schema: { example: { email: 'user@example.com', password: 'password123', expectedRole: 'company_member' } } })
   @ApiResponse({ status: 200, description: 'Login exitoso' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 401, description: 'Credenciales incorrectas' })
-  @ApiResponse({ status: 403, description: 'Rol no coincide con el flujo esperado' })
+  @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  @ApiResponse({ status: 403, description: 'Acceso no autorizado para el flujo solicitado' })
   @ApiResponse({ status: 429, description: 'Demasiados intentos' })
   async login(
     @Body() body: any,
@@ -80,38 +80,53 @@ export class AuthController {
     }
 
     const { email, password, expectedRole, tenantId } = parsed.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (process.env.NODE_ENV !== 'development') {
-      const rateLimitKey = `${email}:${req.headers['x-forwarded-for'] || req.ip || 'unknown'}`;
-      if (!this.rateLimit.checkLoginRateLimit(rateLimitKey)) {
-        res.setHeader('Retry-After', '900');
-        throw new UnauthorizedError('Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.');
-      }
+    if (expectedRole && !mapExpectedRoleToFlow(expectedRole)) {
+      throw new ValidationError(`expectedRole inválido: ${expectedRole}.`);
     }
 
+    const isDev = process.env.NODE_ENV === 'development';
+    const rateLimitKey = `${normalizedEmail}:${req.headers['x-forwarded-for'] || req.ip || 'unknown'}`;
+    if (!isDev && !this.rateLimit.checkLoginRateLimit(rateLimitKey)) {
+      res.setHeader('Retry-After', '900');
+      throw new UnauthorizedError('Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.');
+    }
+
+    // 1) Authenticate credentials first (prevents role-based enumeration)
+    let result: Awaited<ReturnType<AuthService['signIn']>>;
+    try {
+      result = await this.authService.signIn({ email: normalizedEmail, password }, new Headers(req.headers as any));
+    } catch (err: any) {
+      // Normalize BetterAuth / provider errors to a generic 401 (no user/role leakage)
+      const status = err?.status ?? err?.statusCode ?? err?.response?.status;
+      const code = err?.code ?? err?.body?.code;
+      if (status === 401 || status === 400 || code === 'INVALID_EMAIL_OR_PASSWORD' || code === 'INVALID_PASSWORD' || code === 'USER_NOT_FOUND') {
+        throw new UnauthorizedError('Credenciales inválidas');
+      }
+      this.logger.warn(`Login auth error for ${normalizedEmail}: ${err?.message ?? err}`);
+      throw new UnauthorizedError('Credenciales inválidas');
+    }
+    if (!result?.user || !result?.session) {
+      throw new UnauthorizedError('Credenciales inválidas');
+    }
+
+    // 2) Resolve role/tenant for the authenticated identity, then authorize flow
     if (expectedRole) {
-      const expectedFlow = mapExpectedRoleToFlow(expectedRole);
-      if (!expectedFlow) {
-        throw new ValidationError(`expectedRole inválido: ${expectedRole}. Use 'company_member' o 'customer'.`);
+      const expectedFlow = mapExpectedRoleToFlow(expectedRole)!;
+      let identity;
+      try {
+        identity = await this.roleResolver.resolveUserRole(normalizedEmail, tenantId);
+      } catch (err: any) {
+        this.logger.warn(`Role resolution failed post-auth for ${normalizedEmail}: ${err?.message ?? err}`);
+        throw new ForbiddenError('Acceso no autorizado para el flujo solicitado');
       }
-
-      const identity = await this.roleResolver.resolveUserRole(email, tenantId);
-      if (!identity.role) {
-        throw new UnauthorizedError('Usuario no encontrado');
-      }
-
-      if (!this.roleResolver.validateRoleForFlow(identity.role, expectedFlow)) {
-        const targetType = expectedFlow === 'customer' ? 'cliente' : expectedFlow === 'platform_member' ? 'administrador de plataforma' : 'miembro de la empresa';
-        throw new ForbiddenError(`Estas credenciales no corresponden a un ${targetType}. Utiliza el flujo de ${expectedFlow === 'customer' ? 'cliente' : expectedFlow === 'platform_member' ? 'plataforma' : 'administrador'}.`);
+      if (!identity?.role || !this.roleResolver.validateRoleForFlow(identity.role, expectedFlow)) {
+        throw new ForbiddenError('Acceso no autorizado para el flujo solicitado');
       }
     }
 
-    const result = await this.authService.signIn({ email, password }, new Headers(req.headers as any));
-
-    if (process.env.NODE_ENV !== 'development') {
-      const rateLimitKey = `${email}:${req.headers['x-forwarded-for'] || req.ip || 'unknown'}`;
-      this.rateLimit.resetLoginAttempts(rateLimitKey);
-    }
+    if (!isDev) this.rateLimit.resetLoginAttempts(rateLimitKey);
 
     return {
       user: result.user,
@@ -138,17 +153,12 @@ export class AuthController {
       })));
     }
 
-    const { email, password, name, expectedRole, tenantId } = parsed.data;
-
-    if (expectedRole) {
-      const expectedFlow = mapExpectedRoleToFlow(expectedRole);
-      if (!expectedFlow) {
-        throw new ValidationError(`expectedRole inválido: ${expectedRole}. Use 'company_member' o 'customer'.`);
-      }
+    const { email, password, name, expectedRole } = parsed.data;
+    if (expectedRole && !mapExpectedRoleToFlow(expectedRole)) {
+      throw new ValidationError(`expectedRole inválido: ${expectedRole}.`);
     }
 
-    const result = await this.authService.signUp({ email, password, name }, new Headers(req.headers as any));
-
+    const result = await this.authService.signUp({ email: email.trim().toLowerCase(), password, name }, new Headers(req.headers as any));
     return {
       user: result.user,
       session: result.session,

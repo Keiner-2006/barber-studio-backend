@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { AuthService } from '../../shared/auth/auth.service';
 import { RoleResolverService } from '../../shared/auth/role-resolver.service';
 import { RateLimitService } from '../../shared/http/rate-limit.service';
-import { ValidationError, UnauthorizedError, ForbiddenError } from '../../shared/errors/application-errors';
+import { ValidationError, UnauthorizedError, ForbiddenError } from '../../shared/errors/app-error';
 import { Public } from '../../common/decorators/public.decorator';
 
 const loginSchema = z.object({

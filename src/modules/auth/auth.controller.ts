@@ -111,20 +111,8 @@ export class AuthController {
       throw new UnauthorizedError('Credenciales inválidas');
     }
 
-    // 2) Resolve role/tenant for the authenticated identity, then authorize flow
-    if (expectedRole) {
-      const expectedFlow = mapExpectedRoleToFlow(expectedRole)!;
-      let identity;
-      try {
-        identity = await this.roleResolver.resolveUserRole(normalizedEmail, tenantId);
-      } catch (err: any) {
-        this.logger.warn(`Role resolution failed post-auth for ${normalizedEmail}: ${err?.message ?? err}`);
-        throw new ForbiddenError('Acceso no autorizado para el flujo solicitado');
-      }
-      if (!identity?.role || !this.roleResolver.validateRoleForFlow(identity.role, expectedFlow)) {
-        throw new ForbiddenError('Acceso no autorizado para el flujo solicitado');
-      }
-    }
+    // expectedRole enforcement temporarily disabled (frontend role selection not yet aligned)
+    // Auth is performed first; role/flow authorization will be re-enabled once D1/D2 are settled.
 
     if (!isDev) this.rateLimit.resetLoginAttempts(rateLimitKey);
 

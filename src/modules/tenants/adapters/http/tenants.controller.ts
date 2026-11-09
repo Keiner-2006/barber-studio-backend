@@ -32,7 +32,7 @@ export class TenantsController {
     const role = userRole || null;
 
     if (!tenantId) {
-      return { data: { role, tenant: null, branches: [] } };
+      return { role, tenant: null, branches: [] };
     }
 
     const tenantRepo = this.dataSource.getRepository(PlatformTenantEntity);
@@ -49,20 +49,18 @@ export class TenantsController {
     }
 
     return {
-      data: {
-        role,
-        tenant: tenant
-          ? {
-              id: tenant.id,
-              name: tenant.tradeName || tenant.legalName || tenant.slug,
-              slug: tenant.slug,
-              currencyCode: tenant.currencyCode,
-              countryCode: tenant.countryCode,
-              timezone: tenant.timezone,
-            }
-          : null,
-        branches,
-      },
+      role,
+      tenant: tenant
+        ? {
+            id: tenant.id,
+            name: tenant.tradeName || tenant.legalName || tenant.slug,
+            slug: tenant.slug,
+            currencyCode: tenant.currencyCode,
+            countryCode: tenant.countryCode,
+            timezone: tenant.timezone,
+          }
+        : null,
+      branches,
     };
   }
 }

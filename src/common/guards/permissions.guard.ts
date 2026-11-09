@@ -37,7 +37,7 @@ export class PermissionsGuard implements CanActivate {
     const userRole = ctx?.userRole;
 
     const hasPermission = requiredPermissions.every((permission) =>
-      this.checkPermission(permission, userRole)
+      this.checkPermission(permission, userRole ?? '')
     );
 
     if (!hasPermission) {

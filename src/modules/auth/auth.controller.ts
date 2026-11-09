@@ -18,6 +18,7 @@ import { RoleResolverService } from '../../shared/auth/role-resolver.service';
 import { RateLimitService } from '../../shared/http/rate-limit.service';
 import { ValidationError, UnauthorizedError, ForbiddenError } from '../../shared/errors/app-error';
 import { Public } from '../../common/decorators/public.decorator';
+import { RawResponse } from '../../common/decorators/raw-response.decorator';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -57,6 +58,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @RawResponse()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Iniciar sesión' })
   @ApiBody({ schema: { example: { email: 'user@example.com', password: 'password123', expectedRole: 'company_member' } } })
@@ -125,6 +127,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
+  @RawResponse()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar usuario' })
   @ApiBody({ schema: { example: { email: 'user@example.com', password: 'password123', name: 'John Doe' } } })
@@ -155,6 +158,7 @@ export class AuthController {
 
   @Post('logout')
   @Public()
+  @RawResponse()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cerrar sesión' })
   async logout(@Req() req: Request) {
@@ -164,6 +168,7 @@ export class AuthController {
 
   @Get('session')
   @Public()
+  @RawResponse()
   @ApiOperation({ summary: 'Obtener sesión actual' })
   async session(@Req() req: Request) {
     const session = await this.authService.getSession(new globalThis.Headers(req.headers as any));

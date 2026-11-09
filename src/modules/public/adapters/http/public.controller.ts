@@ -30,19 +30,17 @@ export class PublicController {
     const tenant = await tenantRepo.findOne({ where: { slug } });
 
     if (!tenant) {
-      return null, error: 'negocio_no_encontrado' ;
+      return { error: { code: 'NOT_FOUND', message: 'Negocio no encontrado' } };
     }
 
     return {
-      data: {
-        id: tenant.id,
-        tradeName: tenant.tradeName,
-        legalName: tenant.legalName,
-        slug: tenant.slug,
-        businessType: tenant.businessType,
-        countryCode: tenant.countryCode,
-        whatsapp: tenant.whatsapp ?? null,
-      },
+      id: tenant.id,
+      tradeName: tenant.tradeName,
+      legalName: tenant.legalName,
+      slug: tenant.slug,
+      businessType: tenant.businessType,
+      countryCode: tenant.countryCode,
+      whatsapp: tenant.whatsapp ?? null,
     };
   }
 }

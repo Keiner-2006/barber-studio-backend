@@ -30,7 +30,7 @@ export class PublicController {
     const tenant = await tenantRepo.findOne({ where: { slug } });
 
     if (!tenant) {
-      return { data: null, error: 'negocio_no_encontrado' };
+      return null, error: 'negocio_no_encontrado' ;
     }
 
     return {

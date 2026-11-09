@@ -89,6 +89,4 @@ export class BranchesController {
     }
     return found.toPlain();
   }
-    return { data: found.toPlain() };
-  }
 }

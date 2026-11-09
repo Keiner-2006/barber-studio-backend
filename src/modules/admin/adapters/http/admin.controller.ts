@@ -47,7 +47,6 @@ export class AdminController {
       createdAt: t.createdAt,
     }));
   }
-  }
 
   @Post('tenants')
   @Permissions('admin:write')

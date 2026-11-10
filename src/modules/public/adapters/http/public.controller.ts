@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '../../../../common/guards/auth.guard';
@@ -30,7 +31,7 @@ export class PublicController {
     const tenant = await tenantRepo.findOne({ where: { slug } });
 
     if (!tenant) {
-      return { error: { code: 'NOT_FOUND', message: 'Negocio no encontrado' } };
+      throw new NotFoundException('Negocio no encontrado');
     }
 
     return {

@@ -113,13 +113,21 @@ export class AuthController {
       throw new UnauthorizedError('Credenciales inválidas');
     }
 
-    // expectedRole enforcement temporarily disabled (frontend role selection not yet aligned)
-    // Auth is performed first; role/flow authorization will be re-enabled once D1/D2 are settled.
+    const expectedFlow = expectedRole ? mapExpectedRoleToFlow(expectedRole) : null;
+    const resolvedRole = expectedFlow
+      ? await this.roleResolver.resolveUserRole(normalizedEmail, tenantId, expectedFlow)
+      : null;
+    if (expectedFlow && (
+      !resolvedRole?.role ||
+      !this.roleResolver.validateRoleForFlow(resolvedRole.role, expectedFlow)
+    )) {
+      throw new ForbiddenError('Acceso no autorizado para el flujo solicitado');
+    }
 
     if (!isDev) this.rateLimit.resetLoginAttempts(rateLimitKey);
 
     return {
-      user: result.user,
+      user: resolvedRole?.role ? { ...result.user, role: resolvedRole.role } : result.user,
       session: result.session,
       redirect: result.redirect,
     };
